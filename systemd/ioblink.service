@@ -1,0 +1,36 @@
+[Unit]
+Description=Blink a keyboard LED on block-device (NVMe/SATA) activity
+Documentation=https://github.com/jensenbox/ioblink
+After=local-fs.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/ioblink --config /etc/ioblink/config.toml
+User=ioblink
+Group=ioblink
+Restart=always
+RestartSec=2s
+
+# Sandboxing. ProtectKernelTunables is intentionally NOT set: it would make
+# /sys read-only to this unit, which breaks the one thing this service does
+# (write /sys/class/leds/*/brightness and /trigger). ProtectSystem=strict is
+# safe alongside it -- systemd leaves /dev, /proc and /sys untouched under
+# "strict" specifically so API filesystem access still works; write access
+# to the specific LED node comes from the udev rule (99-ioblink.rules)
+# chgrp'ing it to the ioblink group, not from systemd path allowlisting.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectControlGroups=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+[Install]
+WantedBy=multi-user.target

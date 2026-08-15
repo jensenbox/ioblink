@@ -1,0 +1,32 @@
+# ioblink configuration.
+#
+# Default: watch every nvme*n* whole disk, drive the keyboard's Scroll Lock
+# LED (found by USB vendor/product ID so it survives replug and reboot).
+# Adjust `led.selector` for your own keyboard -- find your device with
+# `lsusb`, and confirm which LED name (scrolllock/numlock/capslock) actually
+# has a physical lamp behind it (see README's discovery procedure; not every
+# node the kernel exposes has hardware wired to it).
+
+[led.selector]
+vendor = "03f0"   # lsusb idVendor
+product = "344a"  # lsusb idProduct
+name = "scrolllock"
+
+# Uncomment to target an exact sysfs path instead (not recommended -- the
+# inputN number is reassigned on reboot/replug and this will silently stop
+# working when it changes):
+# [led]
+# path = "/sys/class/leds/input4::scrolllock"
+
+[watch]
+# Empty = autodetect all nvme*n* whole disks present at startup.
+devices = []
+# "read", "write", or "both"
+count = "both"
+# false (default): LED off at idle, on during activity.
+# true: LED on at idle, off during activity.
+invert = false
+
+[timing]
+poll_interval_ms = 50
+min_on_time_ms = 30

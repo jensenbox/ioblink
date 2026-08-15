@@ -1,0 +1,19 @@
+# Grant the `ioblink` service user write access to the LED brightness/trigger
+# sysfs attributes for keyboards it's allowed to drive, without running the
+# service as root.
+#
+# Scoped by USB idVendor/idProduct so this only ever grants access to your
+# own keyboard(s), never every keyboard LED on the system. Edit the
+# idVendor/idProduct pair below to match your device (find it with `lsusb`)
+# -- these ship pointed at an HP KBAR211 (03f0:344a) as a working example,
+# not a default that's correct for your hardware.
+#
+# The `input*::*lock` glob matches capslock/numlock/scrolllock nodes so this
+# rule keeps working if you repoint config.toml's led.selector.name at a
+# different one of the three.
+#
+# Install: sudo cp 99-ioblink.rules /etc/udev/rules.d/ && sudo udevadm control --reload-rules && sudo udevadm trigger
+
+ACTION=="add|change", SUBSYSTEM=="leds", KERNEL=="input*::*lock", ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="344a", \
+  RUN+="/bin/chgrp ioblink /sys%p/brightness /sys%p/trigger", \
+  RUN+="/bin/chmod g+w /sys%p/brightness /sys%p/trigger"
