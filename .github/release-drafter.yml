@@ -1,0 +1,110 @@
+# https://github.com/release-drafter/release-drafter
+name-template: 'v$RESOLVED_VERSION'
+tag-template: 'v$RESOLVED_VERSION'
+
+categories:
+  - title: '⚠️ Breaking Changes'
+    labels:
+      - breaking
+  - title: '🚀 Features'
+    labels:
+      - feature
+      - enhancement
+  - title: '🐛 Bug Fixes'
+    labels:
+      - fix
+      - bug
+  - title: '📚 Documentation'
+    labels:
+      - documentation
+      - docs
+  - title: '🏗️ CI / Tooling'
+    labels:
+      - ci
+      - infrastructure
+  - title: '📦 Dependencies'
+    labels:
+      - dependencies
+  - title: '🧹 Maintenance'
+    labels:
+      - chore
+      - maintenance
+      - refactor
+
+exclude-labels:
+  - skip-changelog
+
+change-template: '- $TITLE (#$NUMBER) @$AUTHOR'
+change-title-escapes: '\<*_&'
+
+template: |
+  ## What's Changed
+
+  $CHANGES
+
+  **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION
+
+version-resolver:
+  major:
+    labels:
+      - breaking
+  minor:
+    labels:
+      - feature
+      - enhancement
+  patch:
+    labels:
+      - fix
+      - bug
+      - chore
+      - maintenance
+      - documentation
+      - docs
+      - ci
+      - infrastructure
+      - dependencies
+      - refactor
+  default: patch
+
+autolabeler:
+  - label: fix
+    title:
+      - '/^fix(\(.+\))?:/i'
+      - '/\bfix(es|ed)?\b/i'
+    branch:
+      - '/^fix\//'
+
+  - label: feature
+    title:
+      - '/^feat(\(.+\))?:/i'
+      - '/\badd(s|ed)?\b/i'
+    branch:
+      - '/^feat(ure)?\//'
+
+  - label: documentation
+    title:
+      - '/^docs(\(.+\))?:/i'
+      - '/\bdoc(s|umentation)?\b/i'
+    branch:
+      - '/^docs?\//'
+
+  - label: ci
+    title:
+      - '/^ci(\(.+\))?:/i'
+    files:
+      - '.github/**'
+
+  - label: chore
+    title:
+      - '/^chore(\(.+\))?:/i'
+      - '/^refactor(\(.+\))?:/i'
+    branch:
+      - '/^chore\//'
+      - '/^refactor\//'
+
+  - label: dependencies
+    title:
+      - '/^(deps|dependencies)(\(.+\))?:/i'
+      - '/\bbump\b/i'
+    branch:
+      - '/^dependabot\//'
