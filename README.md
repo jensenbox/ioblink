@@ -190,6 +190,26 @@ example. Summary:
 real activity light or a lava lamp. 50ms is a starting point, not a
 conclusion — tune it for your own eyes.
 
+## Overhead
+
+Measured on the machine this was built on (a 16-core desktop) at the default
+50ms poll interval / 30ms min-on-time, `pidstat -p <pid> 1 15` against the
+running service:
+
+| Metric | Measured |
+|---|---|
+| CPU (average) | ~0.4% of one core |
+| CPU (peak sample) | ~1% of one core |
+| Resident memory | under 1 MB (`systemctl status` reports ~500 KB typical, ~1 MB peak) |
+
+Each poll tick is one `/proc/diskstats` read plus, only on a state change, a
+couple of small sysfs writes — there's no work proportional to actual disk
+throughput, so cost scales with `poll_interval_ms` (halving the interval
+roughly doubles tick frequency and CPU%), not with how busy the watched
+disks are. These aren't lab numbers from an idle VM; the box was under
+normal daily-driver load (browser, editors, background services) while
+measured.
+
 ## Runtime behavior
 
 - **Reboot**: the LED is re-resolved by USB vendor/product on every start,
