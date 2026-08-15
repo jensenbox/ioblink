@@ -235,3 +235,5 @@ small, focused tool; keep changes in that spirit.
 ## License
 
 [MIT](LICENSE)
+
+<!-- verifying PR-based merge works under branch protection -->
