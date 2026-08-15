@@ -2,10 +2,9 @@
 #
 # Default: watch every nvme*n* whole disk, drive the keyboard's Scroll Lock
 # LED (found by USB vendor/product ID so it survives replug and reboot).
-# Adjust `led.selector` for your own keyboard -- find your device with
-# `lsusb`, and confirm which LED name (scrolllock/numlock/capslock) actually
-# has a physical lamp behind it (see README's discovery procedure; not every
-# node the kernel exposes has hardware wired to it).
+# Adjust `led.selector` for your own keyboard -- run `sudo ioblink discover`
+# to find your device's vendor/product and which LED name actually has a
+# physical lamp behind it (not every node the kernel exposes does).
 
 [led.selector]
 vendor = "03f0"   # lsusb idVendor

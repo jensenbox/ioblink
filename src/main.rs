@@ -194,10 +194,16 @@ fn poll_loop(config: &Config, initial_led: Led, devices: &[String]) -> Option<Le
     let mut last = diskstats::read_diskstats().unwrap_or_default();
     let mut displayed = idle_state;
     let mut activity_since: Option<Instant> = None;
+    let mut last_logged_write_error: Option<String> = None;
     let mut state = LedState::Acquired(initial_led);
     if let LedState::Acquired(led) = &state {
         if let Err(e) = led.set_on(idle_state) {
             warn!("failed to set initial LED state: {e}");
+            // displayed defaults to idle_state, which we just failed to
+            // confirm -- flip it to active_state so the main loop's normal
+            // mismatch-retry logic (below) attempts the write again on the
+            // very first tick instead of assuming it already succeeded.
+            displayed = active_state;
         }
     }
 
@@ -222,11 +228,13 @@ fn poll_loop(config: &Config, initial_led: Led, devices: &[String]) -> Option<Le
                             "LED reappeared, resumed control of {}",
                             led.path().display()
                         );
+                        let mut reacquired_displayed = idle_state;
                         if let Err(e) = led.set_on(idle_state) {
                             warn!("failed to set initial LED state after reacquire: {e}");
+                            reacquired_displayed = active_state;
                         }
                         state = LedState::Acquired(led);
-                        displayed = idle_state;
+                        displayed = reacquired_displayed;
                         activity_since = None;
                     }
                     Err(_) => {
@@ -284,7 +292,10 @@ fn poll_loop(config: &Config, initial_led: Led, devices: &[String]) -> Option<Le
         };
 
         match write_result {
-            Some(Ok(())) => displayed = if activity { active_state } else { idle_state },
+            Some(Ok(())) => {
+                displayed = if activity { active_state } else { idle_state };
+                last_logged_write_error = None;
+            }
             Some(Err(Error::LedNodeMissing(_) | Error::LedNodeNotWritable { .. })) => {
                 warn!("LED node vanished, will keep polling and resume when it returns");
                 state = LedState::Missing {
@@ -292,8 +303,20 @@ fn poll_loop(config: &Config, initial_led: Led, devices: &[String]) -> Option<Le
                 };
                 displayed = idle_state;
                 activity_since = None;
+                last_logged_write_error = None;
             }
-            Some(Err(e)) => warn!("LED write failed: {e}"),
+            Some(Err(e)) => {
+                // The write will be retried every tick until it succeeds
+                // (displayed is left stale on failure, see above) -- under
+                // a sustained fault like a persistent EVIOCGRAB that's once
+                // a tick, every `poll_interval_ms`. Only log on a change so
+                // that doesn't turn into a multiple-times-a-second spam.
+                let msg = e.to_string();
+                if last_logged_write_error.as_deref() != Some(msg.as_str()) {
+                    warn!("LED write failed: {msg}");
+                    last_logged_write_error = Some(msg);
+                }
+            }
             None => {}
         }
     }

@@ -90,9 +90,19 @@ impl Config {
             path: path.to_path_buf(),
             source,
         })?;
-        toml::from_str(&text).map_err(|source| Error::Config {
+        let config: Config = toml::from_str(&text).map_err(|source| Error::Config {
             path: path.to_path_buf(),
             source: Box::new(source),
-        })
+        })?;
+
+        if config.timing.poll_interval_ms == 0 {
+            return Err(Error::Config {
+                path: path.to_path_buf(),
+                source: "timing.poll_interval_ms must be greater than 0 (0 busy-loops a core)"
+                    .into(),
+            });
+        }
+
+        Ok(config)
     }
 }

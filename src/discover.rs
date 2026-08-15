@@ -40,7 +40,7 @@ pub fn run() -> io::Result<()> {
     for c in &candidates {
         println!(
             "  {:<28} keyboard: {:<28} usb: {}",
-            format!("{}", c.led_path.display()),
+            c.led_path.display(),
             c.input_name,
             match (&c.vendor, &c.product) {
                 (Some(v), Some(p)) => format!("{v}:{p}"),
@@ -52,33 +52,52 @@ pub fn run() -> io::Result<()> {
 
     let mut confirmed: Vec<&Candidate> = Vec::new();
     let mut skipped_grabbed: Vec<&Candidate> = Vec::new();
+    let mut skipped_unknown: Vec<&Candidate> = Vec::new();
 
     for c in &candidates {
         println!("--- {} ({}) ---", c.led_path.display(), c.lock_name);
 
         if let Some(event) = &c.event_device {
-            if is_grabbed(event)? {
-                println!(
-                    "  SKIPPED: {} is held by an exclusive grab (EVIOCGRAB) right now.",
-                    event.display()
-                );
-                println!(
-                    "  A light test here would be misleading: writes to brightness report \
-                     success but silently do nothing while a grab is held (see the README's \
-                     EVIOCGRAB gotcha)."
-                );
-                let openers = find_openers(event);
-                if openers.is_empty() {
-                    println!("  Could not identify the holder (need root to read /proc/*/fd).");
-                } else {
-                    println!("  Processes with this device open (one likely holds the grab):");
-                    for (pid, comm) in &openers {
-                        println!("    pid {pid}: {comm}");
+            match check_grab(event) {
+                GrabCheck::Grabbed => {
+                    println!(
+                        "  SKIPPED: {} is held by an exclusive grab (EVIOCGRAB) right now.",
+                        event.display()
+                    );
+                    println!(
+                        "  A light test here would be misleading: writes to brightness report \
+                         success but silently do nothing while a grab is held (see the README's \
+                         EVIOCGRAB gotcha)."
+                    );
+                    let openers = find_openers(event);
+                    if openers.is_empty() {
+                        println!("  Could not identify the holder (need root to read /proc/*/fd).");
+                    } else {
+                        println!("  Processes with this device open (one likely holds the grab):");
+                        for (pid, comm) in &openers {
+                            println!("    pid {pid}: {comm}");
+                        }
                     }
+                    println!(
+                        "  Close/stop that process and re-run `ioblink discover` to test it.\n"
+                    );
+                    skipped_grabbed.push(c);
+                    continue;
                 }
-                println!("  Close/stop that process and re-run `ioblink discover` to test it.\n");
-                skipped_grabbed.push(c);
-                continue;
+                GrabCheck::CouldNotCheck(e) => {
+                    println!(
+                        "  SKIPPED: couldn't check {} for a grab ({e}).",
+                        event.display()
+                    );
+                    println!(
+                        "  A light test here could produce a false negative if something IS \
+                         grabbing it and we just can't see it -- run as root (`sudo ioblink \
+                         discover`) so this check actually works, then re-run.\n"
+                    );
+                    skipped_unknown.push(c);
+                    continue;
+                }
+                GrabCheck::Clear => {}
             }
         }
 
@@ -117,11 +136,15 @@ pub fn run() -> io::Result<()> {
         }
     }
 
-    print_summary(&confirmed, &skipped_grabbed);
+    print_summary(&confirmed, &skipped_grabbed, &skipped_unknown);
     Ok(())
 }
 
-fn print_summary(confirmed: &[&Candidate], skipped_grabbed: &[&Candidate]) {
+fn print_summary(
+    confirmed: &[&Candidate],
+    skipped_grabbed: &[&Candidate],
+    skipped_unknown: &[&Candidate],
+) {
     println!("=== Summary ===\n");
 
     if confirmed.is_empty() {
@@ -132,7 +155,16 @@ fn print_summary(confirmed: &[&Candidate], skipped_grabbed: &[&Candidate]) {
                  before concluding this keyboard has no usable LED.",
                 skipped_grabbed.len()
             );
-        } else {
+        }
+        if !skipped_unknown.is_empty() {
+            println!(
+                "{} node(s) were skipped because grab status couldn't be checked -- re-run as \
+                 root (`sudo ioblink discover`) before concluding this keyboard has no usable \
+                 LED.",
+                skipped_unknown.len()
+            );
+        }
+        if skipped_grabbed.is_empty() && skipped_unknown.is_empty() {
             println!(
                 "This keyboard likely has no usable LED for this technique. See the README's \
                  fallback note (a dedicated USB indicator)."
@@ -250,23 +282,26 @@ fn find_event_device(input_dir: &PathBuf) -> Option<PathBuf> {
     })
 }
 
-/// True if something else currently holds an exclusive EVIOCGRAB on this
-/// device: we try to grab it ourselves and immediately release it. Requires
+enum GrabCheck {
+    Clear,
+    Grabbed,
+    /// We couldn't determine grab status at all (most likely: not running
+    /// as root). This must NOT be treated as "clear" -- silently falling
+    /// through to a light test here is exactly the kind of false negative
+    /// this whole check exists to prevent.
+    CouldNotCheck(io::Error),
+}
+
+/// Try to grab the device ourselves and immediately release it. Requires
 /// read-write access to the device node (root, typically).
-fn is_grabbed(event_path: &Path) -> io::Result<bool> {
+fn check_grab(event_path: &Path) -> GrabCheck {
     let file = match fs::OpenOptions::new()
         .read(true)
         .write(true)
         .open(event_path)
     {
         Ok(f) => f,
-        Err(e) => {
-            println!(
-                "  (couldn't open {} to test for a grab: {e})",
-                event_path.display()
-            );
-            return Ok(false);
-        }
+        Err(e) => return GrabCheck::CouldNotCheck(e),
     };
     let fd = file.as_raw_fd();
     let value: libc::c_int = 1;
@@ -274,9 +309,9 @@ fn is_grabbed(event_path: &Path) -> io::Result<bool> {
     if ret == 0 {
         let release: libc::c_int = 0;
         unsafe { libc::ioctl(fd, EVIOCGRAB, &release as *const libc::c_int) };
-        Ok(false)
+        GrabCheck::Clear
     } else {
-        Ok(true)
+        GrabCheck::Grabbed
     }
 }
 

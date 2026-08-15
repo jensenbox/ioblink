@@ -79,6 +79,7 @@ sudo udevadm control --reload-rules
 sudo udevadm trigger
 
 log "Installing systemd-sleep resume hook to $RESUME_HOOK_PATH"
+sudo mkdir -p "$(dirname "$RESUME_HOOK_PATH")"
 sudo install -m 0755 "$WORKDIR/ioblink/systemd/ioblink-resume.sh" "$RESUME_HOOK_PATH"
 
 log "Installing systemd unit to $UNIT_PATH"

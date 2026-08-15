@@ -99,10 +99,6 @@ instead of looking like dead hardware.
 curl -fsSL https://raw.githubusercontent.com/jensenbox/ioblink/main/install.sh | bash
 ```
 
-Prebuilt Linux binaries (x86_64 and aarch64) are also attached to each
-[release](https://github.com/jensenbox/ioblink/releases) if you'd rather
-skip the from-source build.
-
 Builds from source (needs `cargo`/`git`; get Rust from [rustup.rs](https://rustup.rs)
 if you don't have it) and installs the binary, the dedicated system user, the
 systemd unit, the udev rule, and the suspend/resume hook. It does **not**
@@ -123,6 +119,10 @@ sudo systemctl enable --now ioblink
 Safe to re-run `install.sh` any time (e.g. to pick up an update) — it
 rebuilds and reinstalls the binary/unit/hook but leaves your config and udev
 rule alone.
+
+Prebuilt Linux binaries (x86_64 and aarch64) are also attached to each
+[release](https://github.com/jensenbox/ioblink/releases) if you'd rather
+skip the from-source build.
 
 ### Uninstalling
 
@@ -155,6 +155,7 @@ sudo install -m 0644 systemd/99-ioblink.rules /etc/udev/rules.d/99-ioblink.rules
 sudo udevadm control --reload-rules
 sudo udevadm trigger
 
+sudo mkdir -p /usr/lib/systemd/system-sleep
 sudo install -m 0755 systemd/ioblink-resume.sh /usr/lib/systemd/system-sleep/ioblink
 
 sudo install -m 0644 systemd/ioblink.service /etc/systemd/system/ioblink.service
