@@ -192,9 +192,9 @@ conclusion — tune it for your own eyes.
 
 ## Overhead
 
-Measured on the machine this was built on (a 16-core desktop) at the default
-50ms poll interval / 30ms min-on-time, `pidstat -p <pid> 1 15` against the
-running service:
+Measured on the machine this was built on (Intel Core i9-11900K, 8C/16T @
+3.5GHz) at the default 50ms poll interval / 30ms min-on-time, `pidstat -p
+<pid> 1 15` against the running service:
 
 | Metric | Measured |
 |---|---|
