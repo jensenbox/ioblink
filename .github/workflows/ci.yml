@@ -25,3 +25,5 @@ jobs:
         run: cargo test --all
       - name: build (release)
         run: cargo build --release
+      - name: shellcheck
+        run: shellcheck install.sh uninstall.sh

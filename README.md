@@ -36,6 +36,13 @@ turns it into a disk activity light.
 - Every write is read back and verified. See [the EVIOCGRAB
   gotcha](#the-eviocgrab-gotcha) below for why that matters.
 
+## Commands
+
+| Command | What it does |
+|---|---|
+| `ioblink --config <path>` | Run the poller (this is what the systemd unit invokes). Defaults to `/etc/ioblink/config.toml`. |
+| `ioblink discover` | Interactively find which LED (if any) has a physical lamp, warn about grabbed devices, and print a config snippet. See below. |
+
 ## Before you install: find your LED
 
 Not every `capslock`/`numlock`/`scrolllock` node the kernel exposes has a
@@ -86,6 +93,48 @@ instead of looking like dead hardware.
 
 ## Installation
 
+### Quick install
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/jensenbox/ioblink/main/install.sh | bash
+```
+
+Builds from source (needs `cargo`/`git`; get Rust from [rustup.rs](https://rustup.rs)
+if you don't have it) and installs the binary, the dedicated system user, the
+systemd unit, the udev rule, and the suspend/resume hook. It does **not**
+enable or start the service, and it never overwrites an existing
+`/etc/ioblink/config.toml` or `/etc/udev/rules.d/99-ioblink.rules` — both
+ship pointed at the author's keyboard as a worked example, not a default
+that's correct for yours. The script's last lines tell you exactly what to
+run next:
+
+```sh
+sudo ioblink discover                      # find your LED, get a config snippet
+sudo $EDITOR /etc/ioblink/config.toml       # paste it in
+sudo $EDITOR /etc/udev/rules.d/99-ioblink.rules   # same vendor/product here
+sudo udevadm control --reload-rules && sudo udevadm trigger
+sudo systemctl enable --now ioblink
+```
+
+Safe to re-run `install.sh` any time (e.g. to pick up an update) — it
+rebuilds and reinstalls the binary/unit/hook but leaves your config and udev
+rule alone.
+
+### Uninstalling
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/jensenbox/ioblink/main/uninstall.sh | bash
+```
+
+Stops and disables the service, and removes everything `install.sh` added
+except `/etc/ioblink/config.toml` (it's the one file with your own settings
+in it — the script prints the `rm -rf` command if you want it gone too).
+
+### Manual install
+
+Equivalent to what `install.sh` does, if you'd rather see every step or
+you're packaging this for something else:
+
 ```sh
 cargo build --release
 sudo install -m 0755 target/release/ioblink /usr/local/bin/ioblink
@@ -109,7 +158,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now ioblink.service
 ```
 
-Verify:
+### Verify
 
 ```sh
 systemctl status ioblink.service
