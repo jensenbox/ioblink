@@ -40,24 +40,24 @@ turns it into a disk activity light.
 
 Not every `capslock`/`numlock`/`scrolllock` node the kernel exposes has a
 physical lamp behind it — the kernel creates all three unconditionally
-regardless of the hardware. You have to verify by eye.
+regardless of the hardware. You have to verify by eye, and it's easy to be
+misled (see [the EVIOCGRAB gotcha](#the-eviocgrab-gotcha) below) into
+thinking your keyboard has no lamp when the real problem is a grabby
+background app.
 
-1. **Enumerate**: `ls /sys/class/leds/` and find the `inputN::*` nodes
-   belonging to your keyboard. Cross-check `cat /sys/class/input/inputN/name`
-   against `lsusb` to confirm which input device is actually the keyboard.
-2. **Light-test each candidate.** For each node:
-   ```sh
-   sudo sh -c 'echo none > /sys/class/leds/inputN::NAME/trigger'   # detach first, see below
-   sudo sh -c 'echo 1 > /sys/class/leds/inputN::NAME/brightness'
-   # look at the keyboard
-   sudo sh -c 'echo 0 > /sys/class/leds/inputN::NAME/brightness'
-   sudo sh -c 'echo kbd-NAME > /sys/class/leds/inputN::NAME/trigger'  # restore
-   ```
-   Watch the physical keyboard, not the terminal. Scroll Lock is the best
-   default target since almost nothing else uses it; Num Lock and Caps Lock
-   are more likely to already mean something to you.
-3. **Note the USB IDs** (`lsusb`) for the keyboard so you can scope the udev
-   rule to it specifically (see [Installation](#installation)).
+```sh
+cargo build --release
+sudo ./target/release/ioblink discover
+```
+
+This walks every `capslock`/`numlock`/`scrolllock` node on the system,
+checks each one for an active exclusive grab first (and tells you which
+process to close if it finds one, instead of silently giving you a false
+negative), then walks you through a blink test per candidate: press Enter
+when you're watching the keyboard, it blinks 3 times, you answer y/N. At the
+end it prints a ready-to-paste `[led.selector]` config block for whichever
+node actually lit up, preferring Scroll Lock (nothing else uses it) over Num
+Lock over Caps Lock.
 
 If none of the candidate nodes light up, this approach doesn't work on your
 hardware — the fallback is a dedicated USB indicator (e.g. a
@@ -94,8 +94,8 @@ sudo useradd --system --no-create-home --shell /usr/sbin/nologin ioblink
 
 sudo mkdir -p /etc/ioblink
 sudo install -m 0644 config/ioblink.toml /etc/ioblink/config.toml
-# edit /etc/ioblink/config.toml: set led.selector.vendor/product to your
-# keyboard's lsusb IDs, and .name to whichever candidate actually lit up.
+# edit /etc/ioblink/config.toml: paste in the [led.selector] block that
+# `ioblink discover` printed for you.
 
 # edit systemd/99-ioblink.rules the same way (vendor/product), then:
 sudo install -m 0644 systemd/99-ioblink.rules /etc/udev/rules.d/99-ioblink.rules

@@ -46,18 +46,28 @@ pub fn resolve_by_selector(selector: &LedSelector) -> Result<PathBuf, Error> {
 /// ancestor directory that exposes idVendor/idProduct (the USB device
 /// level -- HID and input intermediate levels don't have these attrs).
 fn device_matches(led_real_path: &Path, vendor: &str, product: &str) -> bool {
+    match find_usb_ids(led_real_path) {
+        Some((v, p)) => v.eq_ignore_ascii_case(vendor) && p.eq_ignore_ascii_case(product),
+        None => false,
+    }
+}
+
+/// Same walk as `device_matches`, but returns whatever vendor/product it
+/// finds instead of comparing against a target. Used by `discover` to show
+/// candidates their actual USB IDs.
+pub fn find_usb_ids(led_real_path: &Path) -> Option<(String, String)> {
     let mut dir = led_real_path;
     while let Some(parent) = dir.parent() {
         let vendor_file = parent.join("idVendor");
         let product_file = parent.join("idProduct");
         if vendor_file.is_file() && product_file.is_file() {
-            let v = fs::read_to_string(&vendor_file).unwrap_or_default();
-            let p = fs::read_to_string(&product_file).unwrap_or_default();
-            return v.trim().eq_ignore_ascii_case(vendor) && p.trim().eq_ignore_ascii_case(product);
+            let v = fs::read_to_string(&vendor_file).ok()?.trim().to_string();
+            let p = fs::read_to_string(&product_file).ok()?.trim().to_string();
+            return Some((v, p));
         }
         dir = parent;
     }
-    false
+    None
 }
 
 pub struct Led {

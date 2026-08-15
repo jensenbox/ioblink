@@ -1,4 +1,5 @@
 mod config;
+mod discover;
 mod diskstats;
 mod error;
 mod led;
@@ -20,9 +21,22 @@ use led::Led;
 #[derive(Parser, Debug)]
 #[command(name = "ioblink", version, about)]
 struct Args {
-    /// Path to the TOML config file.
+    #[command(subcommand)]
+    command: Option<SubCommand>,
+
+    /// Path to the TOML config file. Only used when running the poller
+    /// (i.e. not `ioblink discover`).
     #[arg(short, long, default_value = "/etc/ioblink/config.toml")]
     config: PathBuf,
+}
+
+#[derive(clap::Subcommand, Debug)]
+enum SubCommand {
+    /// Interactively find which keyboard LED (if any) has a physical lamp
+    /// behind it, and print a ready-to-paste config snippet. Detects and
+    /// flags LEDs whose backing input device is currently held by an
+    /// exclusive grab, so a dead app doesn't get misread as dead hardware.
+    Discover,
 }
 
 /// How long to keep retrying to acquire the LED at startup before giving
@@ -45,6 +59,16 @@ static SHOULD_EXIT: AtomicUsize = AtomicUsize::new(0);
 fn main() -> ExitCode {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
     let args = Args::parse();
+
+    if let Some(SubCommand::Discover) = args.command {
+        return match discover::run() {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(e) => {
+                error!("{e}");
+                ExitCode::FAILURE
+            }
+        };
+    }
 
     if let Err(e) = install_signal_handlers() {
         error!("failed to install signal handlers: {e}");
